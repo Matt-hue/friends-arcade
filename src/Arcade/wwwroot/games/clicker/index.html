@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>10-Second Clicker</title>
+  <style>body{font-family:sans-serif;max-width:480px;margin:2rem auto;padding:0 1rem}button#click{font-size:2rem;padding:1rem 2rem}</style>
+</head>
+<body>
+  <p><a href="/">&larr; Arcade</a></p>
+  <h1>10-Second Clicker</h1>
+  <p>Time: <span id="time">10</span>s &middot; Score: <span id="score">0</span></p>
+  <button id="click">Click!</button>
+  <form id="save" hidden>
+    <input id="player" placeholder="Your name" maxlength="30" required>
+    <button>Save score</button>
+  </form>
+  <h2>Top 10</h2>
+  <ol id="board"></ol>
+  <script>
+    const GAME = 'clicker';
+    const esc = s => Object.assign(document.createElement('div'), { textContent: s }).innerHTML;
+    let score = 0, time = 10, timer = null;
+    async function loadBoard() {
+      const rows = await (await fetch('/api/scores/' + GAME)).json();
+      document.getElementById('board').innerHTML = rows.map(r => `<li>${esc(r.player)} &mdash; ${r.score}</li>`).join('');
+    }
+    document.getElementById('click').onclick = () => {
+      if (time <= 0) { score = 0; time = 10; document.getElementById('save').hidden = true; }
+      score++;
+      document.getElementById('score').textContent = score;
+      if (!timer) timer = setInterval(() => {
+        time--;
+        document.getElementById('time').textContent = time;
+        if (time <= 0) { clearInterval(timer); timer = null; document.getElementById('save').hidden = false; }
+      }, 1000);
+    };
+    document.getElementById('save').onsubmit = async e => {
+      e.preventDefault();
+      await fetch('/api/scores', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game: GAME, player: player.value, score }) });
+      document.getElementById('save').hidden = true;
+      loadBoard();
+    };
+    loadBoard();
+  </script>
+</body>
+</html>

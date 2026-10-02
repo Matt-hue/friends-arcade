@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Friends Arcade</title>
+  <style>body{font-family:sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem}li{margin:.3rem 0}</style>
+</head>
+<body>
+  <h1>Friends Arcade</h1>
+  <h2>Games</h2>
+  <ul id="games"></ul>
+  <h2>Feature ideas</h2>
+  <form id="idea-form">
+    <input id="author" placeholder="Your name" maxlength="30" required>
+    <input id="text" placeholder="Your idea" maxlength="500" required>
+    <button>Submit</button>
+  </form>
+  <ul id="ideas"></ul>
+  <script>
+    const esc = s => Object.assign(document.createElement('div'), { textContent: s }).innerHTML;
+    fetch('/games.json').then(r => r.json()).then(gs => {
+      document.getElementById('games').innerHTML = gs.map(g => `<li><a href="${esc(g.path)}">${esc(g.name)}</a></li>`).join('');
+    });
+    async function loadIdeas() {
+      const ideas = await (await fetch('/api/ideas')).json();
+      document.getElementById('ideas').innerHTML = ideas.map(i => `<li><b>${esc(i.author)}</b>: ${esc(i.text)}</li>`).join('');
+    }
+    document.getElementById('idea-form').onsubmit = async e => {
+      e.preventDefault();
+      await fetch('/api/ideas', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: author.value, text: text.value }) });
+      text.value = '';
+      loadIdeas();
+    };
+    loadIdeas();
+  </script>
+</body>
+</html>
