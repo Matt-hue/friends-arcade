@@ -14,7 +14,7 @@ dotnet run
 
 Open the URL printed in the console. Without a database configured, scores are kept in memory and reset on restart.
 
-To use PostgreSQL locally, set `POSTGRESQL_ADDON_URI` (e.g. `******localhost:5432/arcade`) or `ConnectionStrings__Default`. The `scores` table is created automatically.
+To use PostgreSQL locally, set `POSTGRESQL_ADDON_URI` (e.g. a `postgres://` URI for your local database, host `localhost`, port `5432`) or `ConnectionStrings__Default`. The `scores` table is created automatically.
 
 ## API
 - `GET /api/scores` – top 10 scores
