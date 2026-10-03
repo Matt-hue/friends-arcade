@@ -1,5 +1,5 @@
 body { font-family: system-ui, sans-serif; background: #14141f; color: #eee; margin: 0; }
-.container { max-width: 640px; margin: 0 auto; padding: 1.5rem; }
+.container { box-sizing: border-box; width: 100%; max-width: 640px; margin: 0 auto; padding: 1.5rem; }
 button { font-size: 1rem; padding: .6rem 1.2rem; border-radius: 8px; border: 0; background: #6c5ce7; color: #fff; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
 input { font-size: 1rem; padding: .5rem; border-radius: 8px; border: 1px solid #444; background: #1f1f2e; color: #eee; }

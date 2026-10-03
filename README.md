@@ -14,7 +14,7 @@ src/Arcade/            separate PostgreSQL-backed arcade implementation
 
 ## Local development
 
-Requirements: .NET 8 SDK, Node.js.
+Requirements: .NET 8 SDK, Node.js `^20.19.0` or `>=22.12.0` (Vite 8 requirement).
 
 ```bash
 # terminal 1: API on http://localhost:5000
