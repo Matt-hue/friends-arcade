@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { submitScore } from '../../api.js'
+import { createRoom, finishRoom, getRoom, submitScore } from '../../api.js'
 
 const DURATION = 15
 const SIZE = 80
@@ -21,12 +21,43 @@ export default function ClickRush({ onScoreSubmitted }) {
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [room, setRoom] = useState(null)
+  const [roomError, setRoomError] = useState('')
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const timer = useRef(null)
   const endTime = useRef(0)
   const arena = useRef(null)
   const submitting = useRef(false)
+  const lastRoomScore = useRef(0)
 
   useEffect(() => () => clearInterval(timer.current), [])
+
+  useEffect(() => {
+    if (!room?.code || state !== 'playing') return undefined
+    let active = true
+    const poll = async () => {
+      try {
+        const current = await getRoom(room.code)
+        if (!active) return
+        if (current.score > lastRoomScore.current) setPos(randomPos(arena.current))
+        lastRoomScore.current = current.score
+        setRoom(current)
+        setRoomError('')
+      } catch (err) {
+        if (active) setRoomError(err.message)
+      }
+    }
+    poll()
+    const interval = setInterval(poll, 500)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [room?.code, state])
+
+  useEffect(() => {
+    if (state === 'done' && room?.code) finishRoom(room.code).catch(() => {})
+  }, [room?.code, state])
 
   useEffect(() => {
     const element = arena.current
@@ -46,6 +77,9 @@ export default function ClickRush({ onScoreSubmitted }) {
     setTimeLeft(DURATION)
     setMessage('')
     setSubmitted(false)
+    setRoom(null)
+    setRoomError('')
+    lastRoomScore.current = 0
     setState('playing')
     setPos(randomPos(arena.current))
     clearInterval(timer.current)
@@ -58,6 +92,20 @@ export default function ClickRush({ onScoreSubmitted }) {
         setState('done')
       }
     }, 100)
+  }
+
+  async function createMultiplayerRoom() {
+    setIsCreatingRoom(true)
+    setRoomError('')
+    try {
+      const newRoom = await createRoom()
+      setRoom(newRoom)
+      lastRoomScore.current = newRoom.score
+    } catch (err) {
+      setRoomError(err.message)
+    } finally {
+      setIsCreatingRoom(false)
+    }
   }
 
   function hit() {
@@ -79,7 +127,7 @@ export default function ClickRush({ onScoreSubmitted }) {
     setIsSubmitting(true)
     setMessage('')
     try {
-      await submitScore('click-rush', name, score)
+      await submitScore('click-rush', name, totalScore)
       setSubmitted(true)
       setMessage('Score submitted!')
       onScoreSubmitted?.()
@@ -91,14 +139,34 @@ export default function ClickRush({ onScoreSubmitted }) {
     }
   }
 
+  const totalScore = score + (room?.score ?? 0)
+
   return (
     <div className="card">
-      <p>Score: {score} | Time: {timeLeft}s</p>
+      <p>Score: {totalScore} | Time: {timeLeft}s</p>
+      {state === 'playing' && !room && (
+        <p><button onClick={createMultiplayerRoom} disabled={isCreatingRoom}>
+          {isCreatingRoom ? 'Creating room…' : 'Play with friends on phones'}
+        </button></p>
+      )}
+      {room && (
+        <section className="room-panel" aria-live="polite">
+          <h3>Room code: <span className="room-code">{room.code}</span></h3>
+          <p>Friends: {room.players.length}/8 · Score: {room.score}</p>
+          <p>On each phone, open this site, tap <strong>Phone controller</strong>, and enter the code.</p>
+          {room.players.length > 0 && (
+            <ol className="player-scores">
+              {room.players.map((player) => <li key={player.name}>{player.name}: {player.score}</li>)}
+            </ol>
+          )}
+        </section>
+      )}
       <div className="arena" ref={arena}>
         {state === 'playing' && (
           <button className="target" style={{ left: pos.x, top: pos.y }} onClick={hit} aria-label="target" />
         )}
       </div>
+      {roomError && <p role="alert">{roomError}</p>}
       {state !== 'playing' && <p><button onClick={start} disabled={isSubmitting}>{state === 'idle' ? 'Start' : 'Play again'}</button></p>}
       {state === 'done' && (
         <form onSubmit={submit}>
@@ -106,6 +174,11 @@ export default function ClickRush({ onScoreSubmitted }) {
           <button type="submit" disabled={isSubmitting || submitted}>
             {isSubmitting ? 'Submitting…' : submitted ? 'Score submitted' : 'Submit score'}
           </button>
+          {room?.players.length > 0 && (
+            <ol className="player-scores">
+              {room.players.map((player) => <li key={player.name}>{player.name}: {player.score}</li>)}
+            </ol>
+          )}
           {message && <p>{message}</p>}
         </form>
       )}

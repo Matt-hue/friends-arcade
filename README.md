@@ -34,6 +34,12 @@ Production-like run: `cd client && npm run build`, copy `client/dist/*` into `se
 
 Scores are stored in memory and reset on restart. This in-memory leaderboard works with a single instance only.
 
+## Play together on phones
+
+In Click Rush, start a game and choose **Play with friends on phones**. Share the room code with friends; on each phone, open the arcade, choose **Phone controller**, enter the code and a player name, then tap **HIT!** to play together. The host screen shows the shared score and each player's hits.
+
+Multiplayer rooms are stored in memory, expire after 30 minutes, and work with a single server instance.
+
 ## Adding a game
 
 1. Create `client/src/games/<your-game>/YourGame.jsx` (a component; it may call `submitScore` from `src/api.js`).
