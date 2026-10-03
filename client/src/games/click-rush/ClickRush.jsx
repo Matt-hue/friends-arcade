@@ -30,6 +30,8 @@ export default function ClickRush({ onScoreSubmitted }) {
   const arena = useRef(null)
   const submitting = useRef(false)
   const lastRoomScore = useRef(0)
+  const roomCode = useRef(null)
+  const gameFinished = useRef(false)
 
   useEffect(() => () => clearInterval(timer.current), [])
 
@@ -56,25 +58,26 @@ export default function ClickRush({ onScoreSubmitted }) {
     }
   }, [room?.code, state])
 
-  useEffect(() => {
-    if (state !== 'done' || !room?.code) return undefined
-    let active = true
+  async function finalizeRoom(code) {
     setIsFinishingRoom(true)
-    finishRoom(room.code)
-      .then(() => getRoom(room.code))
-      .then((finalRoom) => {
-        if (active) setRoom(finalRoom)
-      })
-      .catch((err) => {
-        if (active) setRoomError(err.message)
-      })
-      .finally(() => {
-        if (active) setIsFinishingRoom(false)
-      })
-    return () => {
-      active = false
+    try {
+      await finishRoom(code)
+      setRoom(await getRoom(code))
+    } catch (err) {
+      setRoomError(err.message)
+    } finally {
+      setIsFinishingRoom(false)
     }
-  }, [room?.code, state])
+  }
+
+  function endGame() {
+    if (gameFinished.current) return
+    gameFinished.current = true
+    clearInterval(timer.current)
+    setTimeLeft(0)
+    setState('done')
+    if (roomCode.current) finalizeRoom(roomCode.current)
+  }
 
   useEffect(() => {
     const element = arena.current
@@ -97,6 +100,8 @@ export default function ClickRush({ onScoreSubmitted }) {
     setRoom(null)
     setRoomError('')
     lastRoomScore.current = 0
+    roomCode.current = null
+    gameFinished.current = false
     setState('playing')
     setPos(randomPos(arena.current))
     clearInterval(timer.current)
@@ -104,10 +109,7 @@ export default function ClickRush({ onScoreSubmitted }) {
     timer.current = setInterval(() => {
       const remaining = Math.max(0, Math.ceil((endTime.current - Date.now()) / 1000))
       setTimeLeft(remaining)
-      if (remaining === 0) {
-        clearInterval(timer.current)
-        setState('done')
-      }
+      if (remaining === 0) endGame()
     }, 100)
   }
 
@@ -118,6 +120,8 @@ export default function ClickRush({ onScoreSubmitted }) {
       const newRoom = await createRoom()
       setRoom(newRoom)
       lastRoomScore.current = newRoom.score
+      roomCode.current = newRoom.code
+      if (gameFinished.current) finalizeRoom(newRoom.code)
     } catch (err) {
       setRoomError(err.message)
     } finally {
@@ -127,9 +131,7 @@ export default function ClickRush({ onScoreSubmitted }) {
 
   function hit() {
     if (Date.now() >= endTime.current) {
-      clearInterval(timer.current)
-      setTimeLeft(0)
-      setState('done')
+      endGame()
       return
     }
     setScore((s) => s + 1)
