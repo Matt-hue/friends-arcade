@@ -24,6 +24,7 @@ export default function ClickRush({ onScoreSubmitted }) {
   const [room, setRoom] = useState(null)
   const [roomError, setRoomError] = useState('')
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
+  const [isFinishingRoom, setIsFinishingRoom] = useState(false)
   const timer = useRef(null)
   const endTime = useRef(0)
   const arena = useRef(null)
@@ -56,7 +57,23 @@ export default function ClickRush({ onScoreSubmitted }) {
   }, [room?.code, state])
 
   useEffect(() => {
-    if (state === 'done' && room?.code) finishRoom(room.code).catch(() => {})
+    if (state !== 'done' || !room?.code) return undefined
+    let active = true
+    setIsFinishingRoom(true)
+    finishRoom(room.code)
+      .then(() => getRoom(room.code))
+      .then((finalRoom) => {
+        if (active) setRoom(finalRoom)
+      })
+      .catch((err) => {
+        if (active) setRoomError(err.message)
+      })
+      .finally(() => {
+        if (active) setIsFinishingRoom(false)
+      })
+    return () => {
+      active = false
+    }
   }, [room?.code, state])
 
   useEffect(() => {
@@ -167,12 +184,12 @@ export default function ClickRush({ onScoreSubmitted }) {
         )}
       </div>
       {roomError && <p role="alert">{roomError}</p>}
-      {state !== 'playing' && <p><button onClick={start} disabled={isSubmitting}>{state === 'idle' ? 'Start' : 'Play again'}</button></p>}
+      {state !== 'playing' && <p><button onClick={start} disabled={isSubmitting || isFinishingRoom}>{state === 'idle' ? 'Start' : 'Play again'}</button></p>}
       {state === 'done' && (
         <form onSubmit={submit}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={20} required />{' '}
-          <button type="submit" disabled={isSubmitting || submitted}>
-            {isSubmitting ? 'Submitting…' : submitted ? 'Score submitted' : 'Submit score'}
+          <button type="submit" disabled={isSubmitting || submitted || isFinishingRoom}>
+            {isFinishingRoom ? 'Finalizing game…' : isSubmitting ? 'Submitting…' : submitted ? 'Score submitted' : 'Submit score'}
           </button>
           {room?.players.length > 0 && (
             <ol className="player-scores">

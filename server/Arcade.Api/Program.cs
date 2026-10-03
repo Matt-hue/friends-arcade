@@ -20,6 +20,7 @@ app.MapPost("/api/rooms", () =>
         rooms.TryRemove(expired.Key, out _);
 
     string code;
+    MultiplayerRoom room;
     do
     {
         code = string.Create(6, 0, (chars, _) =>
@@ -28,10 +29,8 @@ app.MapPost("/api/rooms", () =>
             for (var i = 0; i < chars.Length; i++)
                 chars[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
         });
-    } while (rooms.ContainsKey(code));
-
-    var room = new MultiplayerRoom(code);
-    rooms[code] = room;
+        room = new MultiplayerRoom(code);
+    } while (!rooms.TryAdd(code, room));
     return Results.Ok(room.Snapshot());
 });
 

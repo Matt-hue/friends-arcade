@@ -15,8 +15,11 @@ export default function PhoneController() {
     let active = true
     const poll = async () => {
       try {
-        setRoom(await getRoom(room.code))
-        if (active) setMessage('')
+        const current = await getRoom(room.code)
+        if (active) {
+          setRoom(current)
+          setMessage('')
+        }
       } catch (err) {
         if (active) setMessage(err.message)
       }
