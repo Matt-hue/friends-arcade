@@ -6,3 +6,18 @@ input { font-size: 1rem; padding: .5rem; border-radius: 8px; border: 1px solid #
 .card { background: #1f1f2e; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
 .target { width: 80px; height: 80px; border-radius: 50%; background: #fd79a8; border: 0; padding: 0; position: absolute; }
 .arena { position: relative; height: 300px; background: #14141f; border-radius: 8px; overflow: hidden; }
+.room-panel { border: 1px solid #45455e; border-radius: 8px; padding: .75rem 1rem; margin: 1rem 0; }
+.room-panel h3 { margin-top: 0; }
+.room-code { letter-spacing: .15em; color: #fd79a8; }
+.player-scores { text-align: left; padding-left: 1.5rem; }
+.controller { box-sizing: border-box; width: 100%; max-width: 520px; min-height: 100dvh; margin: 0 auto; padding: 1rem; }
+.controller a { color: #c4baff; }
+.controller-form { display: grid; gap: 1rem; }
+.controller-form label { display: grid; gap: .5rem; }
+.controller-form input { box-sizing: border-box; width: 100%; min-height: 48px; }
+.controller-game { text-align: center; }
+.hit-button { width: 100%; min-height: 45dvh; margin: 1rem 0; font-size: clamp(2.5rem, 15vw, 5rem); font-weight: 800; touch-action: manipulation; background: #fd79a8; color: #24111a; }
+@media (max-width: 480px) {
+  .container { padding: 1rem; }
+  button { min-height: 44px; }
+}
