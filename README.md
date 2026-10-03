@@ -43,7 +43,7 @@ Multiplayer rooms are stored in memory, expire after 30 minutes, and work with a
 ## Adding a game
 
 1. Create `client/src/games/<your-game>/YourGame.jsx` (a component; it may call `submitScore` from `src/api.js`).
-2. Register it in `client/src/games/index.js`.
+2. Register it in `client/src/games/index.js` (id, title, icon, description, component) – it then appears in the lobby and nav automatically at `#/<id>`.
 3. Open a pull request.
 
 ## Deploying to Clever Cloud
