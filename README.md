@@ -36,3 +36,7 @@ Local disk on Clever Cloud is ephemeral, so data lives in a managed PostgreSQL a
 2. Create an application of type **Docker** from this GitHub repo, branch `main`. The root `Dockerfile` builds the app; it listens on port 8080 (Clever Cloud's default).
 3. In the application's **Service dependencies**, link the PostgreSQL add-on. This injects the `POSTGRESQL_ADDON_*` variables.
 4. Deploy. Check `/api/health`.
+
+## Earlier standalone starter
+
+The earlier Whack-a-Dot starter remains in `src/FriendsArcade`. It is a separate .NET 8 app; to run it, use `cd src/FriendsArcade && dotnet run`. The root `Dockerfile` deploys the PostgreSQL-backed arcade in `src/Arcade`.

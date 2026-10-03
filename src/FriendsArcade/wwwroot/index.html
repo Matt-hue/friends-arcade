@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friends Arcade</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; text-align: center; }
+  #target { position: relative; width: 320px; height: 320px; margin: 1rem auto; background: #222; border-radius: 8px; }
+  #dot { position: absolute; width: 40px; height: 40px; border-radius: 50%; background: #f5a623; border: 0; cursor: pointer; }
+  ol { display: inline-block; text-align: left; }
+</style>
+</head>
+<body>
+<h1>Friends Arcade</h1>
+<h2>Whack-a-Dot</h2>
+<p>Click the dot! 15 seconds. Score: <b id="score">0</b> | Time: <b id="time">-</b></p>
+<button id="start">Start</button>
+<div id="target"><button id="dot" hidden aria-label="dot"></button></div>
+<h3>Leaderboard</h3>
+<ol id="board"></ol>
+<script>
+const $ = id => document.getElementById(id);
+let score = 0, left = 0, timer;
+
+function move() {
+  $('dot').style.left = Math.random() * 280 + 'px';
+  $('dot').style.top = Math.random() * 280 + 'px';
+}
+
+async function loadBoard() {
+  const res = await fetch('/api/scores');
+  const scores = await res.json();
+  $('board').replaceChildren(...scores.map(s => {
+    const li = document.createElement('li');
+    li.textContent = `${s.name}: ${s.points}`;
+    return li;
+  }));
+}
+
+async function finish() {
+  clearInterval(timer);
+  $('dot').hidden = true;
+  $('start').disabled = false;
+  const name = prompt(`Time's up! You scored ${score}. Your name?`);
+  if (name && name.trim()) {
+    await fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim().slice(0, 20), points: score })
+    });
+    loadBoard();
+  }
+}
+
+$('start').onclick = () => {
+  score = 0; left = 15;
+  $('score').textContent = score; $('time').textContent = left;
+  $('start').disabled = true; $('dot').hidden = false; move();
+  timer = setInterval(() => {
+    $('time').textContent = --left;
+    if (left <= 0) finish();
+  }, 1000);
+};
+$('dot').onclick = () => { $('score').textContent = ++score; move(); };
+loadBoard();
+</script>
+</body>
+</html>
