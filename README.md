@@ -1,29 +1,42 @@
 # friends-arcade
 A tiny browser arcade built by friends. Add a game, send a PR.
 
-Stack: ASP.NET Core (.NET 8) minimal API + plain HTML/JS frontend served from `src/FriendsArcade/wwwroot`.
-Includes a starter game (Whack-a-Dot) with a leaderboard.
+ASP.NET Core (.NET 8) backend + plain HTML/JS frontend served from `wwwroot`. Scores and feature ideas are persisted in PostgreSQL.
 
-## Run locally
-Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
-
-```bash
-cd src/FriendsArcade
-dotnet run
-```
-
-Open the URL printed in the console. Without a database configured, scores are kept in memory and reset on restart.
-
-To use PostgreSQL locally, set `POSTGRESQL_ADDON_URI` (e.g. a `postgres://` URI for your local database, host `localhost`, port `5432`) or `ConnectionStrings__Default`. The `scores` table is created automatically.
-
-## API
-- `GET /api/scores` – top 10 scores
-- `POST /api/scores` – body `{ "name": "...", "points": 12 }`
-
-## Deploy to Clever Cloud
-1. Create an application of type **Docker** and link this repo, branch `main`. The root `Dockerfile` builds and starts the app on port 8080.
-2. Create a **PostgreSQL** addon and link it to the application. Clever Cloud injects `POSTGRESQL_ADDON_URI`, which the app uses automatically (the table is created on startup). Without the addon the app still runs, using in-memory scores.
-3. Deploy (push to the branch).
+## Structure
+- `src/Arcade/Program.cs` – app startup, schema init, routes
+- `src/Arcade/Db.cs` – connection config + schema (`CREATE TABLE IF NOT EXISTS`, run at startup)
+- `src/Arcade/Features.cs` – API endpoints (scores, ideas)
+- `src/Arcade/wwwroot/` – frontend; each game lives in `wwwroot/games/<id>/`
 
 ## Adding a game
-Add files under `src/FriendsArcade/wwwroot` and open a PR.
+1. Create `src/Arcade/wwwroot/games/<id>/index.html`.
+2. Register it in `src/Arcade/wwwroot/games.json`.
+3. Save scores with `POST /api/scores` (`{ "game": "<id>", "player": "...", "score": 123 }`) and read with `GET /api/scores/<id>`.
+
+## API
+- `GET /api/scores/{game}` – top 10 · `POST /api/scores`
+- `GET /api/ideas` · `POST /api/ideas` (`{ "author", "text" }`)
+- `GET /api/health`
+
+## Run locally
+Start a PostgreSQL (e.g. `docker run -e POSTGRES_PASSWORD=pw -p 5432:5432 postgres:16`), then:
+
+```
+cd src/Arcade
+ConnectionStrings__Default="Host=localhost;Database=postgres;Username=postgres;******" dotnet run
+```
+
+## Database configuration
+The app reads, in order: `POSTGRESQL_ADDON_URI`, the `POSTGRESQL_ADDON_HOST/PORT/DB/USER/PASSWORD` variables, then `ConnectionStrings__Default`. Clever Cloud sets the `POSTGRESQL_ADDON_*` variables automatically when you link the add-on. Tables are created on startup.
+
+## Deploy on Clever Cloud (EU)
+Local disk on Clever Cloud is ephemeral, so data lives in a managed PostgreSQL add-on.
+1. Create a **PostgreSQL** add-on (the smallest/free "DEV" plan is fine to start), region Paris.
+2. Create an application of type **Docker** from this GitHub repo, branch `main`. The root `Dockerfile` builds the app; it listens on port 8080 (Clever Cloud's default).
+3. In the application's **Service dependencies**, link the PostgreSQL add-on. This injects the `POSTGRESQL_ADDON_*` variables.
+4. Deploy. Check `/api/health`.
+
+## Earlier standalone starter
+
+The earlier Whack-a-Dot starter remains in `src/FriendsArcade`. It is a separate .NET 8 app; to run it, use `cd src/FriendsArcade && dotnet run`. The root `Dockerfile` deploys the PostgreSQL-backed arcade in `src/Arcade`.
