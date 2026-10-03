@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getRoom, joinRoom, recordRoomHit } from '../api.js'
 
 export default function PhoneController() {
@@ -7,8 +7,6 @@ export default function PhoneController() {
   const [room, setRoom] = useState(null)
   const [message, setMessage] = useState('')
   const [isJoining, setIsJoining] = useState(false)
-  const [isHitting, setIsHitting] = useState(false)
-  const hitting = useRef(false)
 
   useEffect(() => {
     if (!room?.code) return undefined
@@ -17,7 +15,11 @@ export default function PhoneController() {
       try {
         const current = await getRoom(room.code)
         if (active) {
-          setRoom(current)
+          setRoom((previous) => {
+            if (previous?.finished && !current.finished) return previous
+            if (previous && current.score < previous.score) return previous
+            return current
+          })
           setMessage('')
         }
       } catch (err) {
@@ -47,17 +49,13 @@ export default function PhoneController() {
   }
 
   async function hit() {
-    if (hitting.current || room?.finished) return
-    hitting.current = true
-    setIsHitting(true)
+    if (room?.finished) return
     try {
-      setRoom(await recordRoomHit(room.code, name))
+      const updatedRoom = await recordRoomHit(room.code, name)
+      setRoom((current) => current && updatedRoom.score >= current.score ? updatedRoom : current)
       setMessage('')
     } catch (err) {
       setMessage(err.message)
-    } finally {
-      hitting.current = false
-      setIsHitting(false)
     }
   }
 
@@ -81,8 +79,8 @@ export default function PhoneController() {
         <section className="card controller-game">
           <p>Room <strong className="room-code">{room.code}</strong></p>
           <p>Team score: <strong>{room.score}</strong></p>
-          <button className="hit-button" onClick={hit} disabled={isHitting || room.finished}>
-            {room.finished ? 'Game over' : isHitting ? 'Hitting…' : 'HIT!'}
+          <button className="hit-button" onClick={hit} disabled={room.finished}>
+            {room.finished ? 'Game over' : 'HIT!'}
           </button>
           <h2>Players</h2>
           <ol className="player-scores">

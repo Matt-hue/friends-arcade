@@ -30,14 +30,19 @@ export async function recordRoomHit(code, name) {
   return roomRequest(`/api/rooms/${encodeURIComponent(code)}/hits`, 'POST', { name })
 }
 
-export async function finishRoom(code) {
-  return roomRequest(`/api/rooms/${encodeURIComponent(code)}/finish`, 'POST')
+export async function finishRoom(code, hostToken) {
+  return roomRequest(`/api/rooms/${encodeURIComponent(code)}/finish`, 'POST', undefined, {
+    'X-Host-Token': hostToken,
+  })
 }
 
-async function roomRequest(url, method = 'GET', body) {
+async function roomRequest(url, method = 'GET', body, headers = {}) {
   const res = await fetch(url, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: {
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...headers,
+    },
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {

@@ -31,20 +31,25 @@ export default function ClickRush({ onScoreSubmitted }) {
   const submitting = useRef(false)
   const lastRoomScore = useRef(0)
   const roomCode = useRef(null)
+  const hostToken = useRef(null)
   const gameFinished = useRef(false)
 
   useEffect(() => () => clearInterval(timer.current), [])
 
   useEffect(() => {
-    if (!room?.code || state !== 'playing') return undefined
+    if (!room?.code || !['idle', 'playing'].includes(state)) return undefined
     let active = true
     const poll = async () => {
       try {
         const current = await getRoom(room.code)
         if (!active) return
         if (current.score > lastRoomScore.current) setPos(randomPos(arena.current))
-        lastRoomScore.current = current.score
-        setRoom(current)
+        lastRoomScore.current = Math.max(lastRoomScore.current, current.score)
+        setRoom((previous) => {
+          if (previous?.finished && !current.finished) return previous
+          if (previous && current.score < previous.score) return previous
+          return { ...current, hostToken: previous?.hostToken }
+        })
         setRoomError('')
       } catch (err) {
         if (active) setRoomError(err.message)
@@ -61,8 +66,8 @@ export default function ClickRush({ onScoreSubmitted }) {
   async function finalizeRoom(code) {
     setIsFinishingRoom(true)
     try {
-      await finishRoom(code)
-      setRoom(await getRoom(code))
+      const finalRoom = await finishRoom(code, hostToken.current)
+      setRoom((previous) => ({ ...finalRoom, hostToken: previous?.hostToken }))
     } catch (err) {
       setRoomError(err.message)
     } finally {
@@ -92,15 +97,18 @@ export default function ClickRush({ onScoreSubmitted }) {
     return () => observer.disconnect()
   }, [])
 
-  function start() {
+  function start(withRoom = false) {
     setScore(0)
     setTimeLeft(DURATION)
     setMessage('')
     setSubmitted(false)
-    setRoom(null)
     setRoomError('')
-    lastRoomScore.current = 0
-    roomCode.current = null
+    if (!withRoom) {
+      setRoom(null)
+      lastRoomScore.current = 0
+      roomCode.current = null
+      hostToken.current = null
+    }
     gameFinished.current = false
     setState('playing')
     setPos(randomPos(arena.current))
@@ -121,7 +129,7 @@ export default function ClickRush({ onScoreSubmitted }) {
       setRoom(newRoom)
       lastRoomScore.current = newRoom.score
       roomCode.current = newRoom.code
-      if (gameFinished.current) finalizeRoom(newRoom.code)
+      hostToken.current = newRoom.hostToken
     } catch (err) {
       setRoomError(err.message)
     } finally {
@@ -163,10 +171,13 @@ export default function ClickRush({ onScoreSubmitted }) {
   return (
     <div className="card">
       <p>Score: {totalScore} | Time: {timeLeft}s</p>
-      {state === 'playing' && !room && (
-        <p><button onClick={createMultiplayerRoom} disabled={isCreatingRoom}>
-          {isCreatingRoom ? 'Creating room…' : 'Play with friends on phones'}
-        </button></p>
+      {state === 'idle' && !room && (
+        <p>
+          <button onClick={() => start()}>Start</button>{' '}
+          <button onClick={createMultiplayerRoom} disabled={isCreatingRoom}>
+            {isCreatingRoom ? 'Creating room…' : 'Play with friends on phones'}
+          </button>
+        </p>
       )}
       {room && (
         <section className="room-panel" aria-live="polite">
@@ -186,18 +197,16 @@ export default function ClickRush({ onScoreSubmitted }) {
         )}
       </div>
       {roomError && <p role="alert">{roomError}</p>}
-      {state !== 'playing' && <p><button onClick={start} disabled={isSubmitting || isFinishingRoom}>{state === 'idle' ? 'Start' : 'Play again'}</button></p>}
+      {state === 'idle' && room && (
+        <p><button onClick={() => start(true)} disabled={!room.players.length}>Start game</button></p>
+      )}
+      {state === 'done' && <p><button onClick={() => start()} disabled={isSubmitting || isFinishingRoom}>Play again</button></p>}
       {state === 'done' && (
         <form onSubmit={submit}>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={20} required />{' '}
           <button type="submit" disabled={isSubmitting || submitted || isFinishingRoom}>
             {isFinishingRoom ? 'Finalizing game…' : isSubmitting ? 'Submitting…' : submitted ? 'Score submitted' : 'Submit score'}
           </button>
-          {room?.players.length > 0 && (
-            <ol className="player-scores">
-              {room.players.map((player) => <li key={player.name}>{player.name}: {player.score}</li>)}
-            </ol>
-          )}
           {message && <p>{message}</p>}
         </form>
       )}

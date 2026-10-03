@@ -8,30 +8,46 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 const int MaxRetainedScores = 10_000;
+const int MaxRetainedRooms = 1_000;
 var scores = new Queue<ScoreEntry>(MaxRetainedScores);
 var scoresLock = new object();
 var rooms = new ConcurrentDictionary<string, MultiplayerRoom>();
+var roomsLock = new object();
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapPost("/api/rooms", () =>
 {
-    foreach (var expired in rooms.Where(pair => pair.Value.ExpiresAt <= DateTime.UtcNow))
-        rooms.TryRemove(expired.Key, out _);
-
-    string code;
-    MultiplayerRoom room;
-    do
+    lock (roomsLock)
     {
-        code = string.Create(6, 0, (chars, _) =>
+        foreach (var expired in rooms.Where(pair => pair.Value.ExpiresAt <= DateTime.UtcNow))
+            rooms.TryRemove(expired.Key, out _);
+        if (rooms.Count >= MaxRetainedRooms)
+            return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+
+        string code;
+        MultiplayerRoom room;
+        do
         {
-            const string alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-            for (var i = 0; i < chars.Length; i++)
-                chars[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+            code = string.Create(6, 0, (chars, _) =>
+            {
+                const string alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+                for (var i = 0; i < chars.Length; i++)
+                    chars[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+            });
+            room = new MultiplayerRoom(code);
+        } while (!rooms.TryAdd(code, room));
+
+        var snapshot = room.Snapshot();
+        return Results.Ok(new
+        {
+            snapshot.Code,
+            snapshot.Score,
+            snapshot.Finished,
+            snapshot.Players,
+            hostToken = room.HostToken
         });
-        room = new MultiplayerRoom(code);
-    } while (!rooms.TryAdd(code, room));
-    return Results.Ok(room.Snapshot());
+    }
 });
 
 app.MapPost("/api/rooms/{code}/players", (string code, PlayerRequest request) =>
@@ -46,13 +62,12 @@ app.MapPost("/api/rooms/{code}/players", (string code, PlayerRequest request) =>
     lock (room)
     {
         var player = room.Players.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (player is null)
-        {
-            if (room.Players.Count >= 8)
-                return Results.Conflict("This room is full.");
-            player = new MultiplayerPlayer(name);
-            room.Players.Add(player);
-        }
+        if (player is not null)
+            return Results.Conflict("A player with this name has already joined.");
+        if (room.Players.Count >= 8)
+            return Results.Conflict("This room is full.");
+        player = new MultiplayerPlayer(name);
+        room.Players.Add(player);
         return Results.Ok(room.Snapshot());
     }
 });
@@ -84,10 +99,15 @@ app.MapGet("/api/rooms/{code}", (string code) =>
         return Results.Ok(room.Snapshot());
 });
 
-app.MapPost("/api/rooms/{code}/finish", (string code) =>
+app.MapPost("/api/rooms/{code}/finish", (string code, HttpRequest request) =>
 {
     if (!TryGetRoom(code, out var room))
         return Results.NotFound("Room not found or expired.");
+    var suppliedToken = request.Headers["X-Host-Token"].ToString();
+    if (!CryptographicOperations.FixedTimeEquals(
+            System.Text.Encoding.UTF8.GetBytes(suppliedToken),
+            System.Text.Encoding.UTF8.GetBytes(room.HostToken)))
+        return Results.Unauthorized();
     lock (room)
     {
         room.Finished = true;
@@ -147,6 +167,7 @@ record RoomSnapshot(string Code, int Score, bool Finished, IReadOnlyList<RoomPla
 sealed class MultiplayerRoom(string code)
 {
     public string Code { get; } = code;
+    public string HostToken { get; } = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     public int Score { get; set; }
     public bool Finished { get; set; }
     public DateTime ExpiresAt { get; } = DateTime.UtcNow.AddMinutes(30);
