@@ -1,0 +1,40 @@
+# Global options. ADMIN_EMAIL / DOMAIN come from the container environment (.env).
+{
+	email {$ADMIN_EMAIL:catrini.m@gmail.com}
+}
+
+# Reusable snippet: security headers + compression. Import in every site.
+(common) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+# Placeholder ASP.NET Core app.
+app.{$DOMAIN:tengudance.com} {
+	import common
+	reverse_proxy app:8080
+}
+
+# Apex domain: minimal static placeholder.
+{$DOMAIN:tengudance.com} {
+	import common
+	respond "tengudance.com - coming soon" 200
+}
+
+www.{$DOMAIN:tengudance.com} {
+	redir https://{$DOMAIN:tengudance.com}{uri} permanent
+}
+
+# Example: adding another subdomain. Certificates are issued per site via the
+# HTTP challenge, so no DNS changes or wildcard certs are needed.
+#
+# myapp.{$DOMAIN:tengudance.com} {
+# 	import common
+# 	reverse_proxy myapp:8080
+# }

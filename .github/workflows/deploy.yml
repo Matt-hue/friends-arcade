@@ -1,0 +1,68 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Optional service to update (default: all)"
+        required: false
+        default: ""
+
+# Never run two deployments at once.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SERVICE: ${{ github.event.inputs.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose file
+        run: docker compose --env-file .env.example config --quiet
+
+      - name: Validate service input
+        run: |
+          if [[ -n "$SERVICE" && ! "$SERVICE" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "Invalid service name" >&2
+            exit 1
+          fi
+
+      - name: Configure SSH (strict host key checking)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<CONF
+          Host deploy-target
+            HostName ${SSH_HOST}
+            User ${SSH_USER}
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+          CONF
+
+      - name: Sync files to server
+        # .env is excluded so it is neither overwritten nor deleted.
+        run: |
+          rsync -az --delete \
+            --exclude '.env' --exclude '.git/' --exclude '.github/' \
+            ./ deploy-target:/opt/stack/
+
+      - name: Run deploy script
+        run: ssh deploy-target "cd /opt/stack && ./scripts/deploy.sh $SERVICE"
