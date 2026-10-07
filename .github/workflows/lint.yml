@@ -1,0 +1,26 @@
+name: Lint
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+
+      - name: Validate compose file
+        run: docker compose --env-file .env.example config --quiet
+
+      - name: Validate Caddyfile
+        run: |
+          docker run --rm \
+            -e ADMIN_EMAIL=admin@example.com -e DOMAIN=example.com \
+            -v "$PWD/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile
